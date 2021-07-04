@@ -1,3 +1,4 @@
+import osproc
 import strutils
 import sequtils
 import fidget
@@ -42,14 +43,16 @@ when isMainModule:
       elif cmd == "close":
           view.commandValue = ""
           view.editorText = ""
+      else:
+          view.editorText = execProcess(command)
 
   proc renderView(view: var View) =
     frame "view":
       box 0, 0, parent.box.w, parent.box.h
 
       rectangle "commandContainer":
-        box 1, 0, parent.box.w-2, 19
-        fill "#FFFFEA"
+        box 0, 0, parent.box.w, 19
+        fill "#AEEEEE"
         strokeWeight 1
         stroke "#000000"
 
@@ -57,7 +60,7 @@ when isMainModule:
           font "Inconsolata", 13.0, 400.0, 17, hLeft, vTop
           box 2, 1, parent.box.w-2, 19
           fill "#000000"
-          highlightColor "#AEEEEE"
+          highlightColor "#888ACA"
           multiline false
           binding view.commandValue
           onRightClick:
@@ -68,15 +71,13 @@ when isMainModule:
 
         rectangle "editorContainer":
           box 0, 0, parent.box.w, parent.box.h
-          strokeWeight 1
-          stroke "#000000"
           fill "#FFFFEA"
 
           text "editor":
             font "Inconsolata", 13.0, 400.0, 13, hLeft, vTop
             box 2, 2, parent.box.w, parent.box.h
             fill "#000000"
-            highlightColor "#AEEEEE"
+            highlightColor "#888ACA"
             multiline true
             binding view.editorText
   
