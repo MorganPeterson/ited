@@ -1,3 +1,5 @@
+## It Ed Hello Ed It Or
+
 import osproc
 import strutils
 import sequtils
@@ -14,23 +16,27 @@ when isMainModule:
       msg: string
       fileName: string
       commandValue: string
+      cmdWidth: float32
+      statusWidth: float32
+      statusXPos: float32
       editorText: string
       statusValue: string
 
   const AvailableCommands: array[3, string] = ["o", "w", "c"]
 
-  proc cmdRightClickHandler(view: var View) =
+  proc cmdHandler(view: var View) =
     var cmd: string
     var arg: string
 
-    let command = textBox.copy().strip()
+    let command = view.commandValue
     
     if command.len > 0:
       for word in split(command):
         if AvailableCommands.anyIt(it == word):
-          cmd = word
+          cmd = word.strip()
         else:
-          arg = word
+          arg = word.strip()
+      view.msg = ""
       case cmd
         of AvailableCommands[0]:
           # open - read file
@@ -38,18 +44,20 @@ when isMainModule:
             view.editorText = readFile(arg)
             view.fileName = arg
             view.dirty = 0
-            view.msg = "Open Success"
-          except IOError:
-            view.msg = "Open Failed"
+          except:
+            view.msg = getCurrentExceptionMsg()
             discard
         of AvailableCommands[1]:
           # write - write to file
           try:
-            writeFile(arg, view.editorText)
+            if arg.len == 0:
+              writeFile(view.fileName, view.editorText)
+            else:
+              writeFile(arg, view.editorText)
             view.dirty = 0
-            view.msg = "Write Success"
+            view.msg = "Written"
           except IOError:
-            view.msg = "Write Failed"
+            view.msg = getCurrentExceptionMsg()
             discard
         of AvailableCommands[2]:
           # close - remove text from buffer
@@ -61,6 +69,7 @@ when isMainModule:
           try:
             view.editorText = execProcess(command)
           except:
+            view.msg = getCurrentExceptionMsg()
             discard
 
   proc computeStatusLine(view: var View): string =
@@ -71,7 +80,14 @@ when isMainModule:
     let dy = "[ " & view.dirty.intToStr() & " ] "
     result = dy & fn & lines & words & chars & " " & view.msg
 
+  proc computeCmdWidths(view: var View, pWidth: float32) =
+    view.cmdWidth = pWidth / 3
+    view.statusXPos = view.cmdWidth
+    view.statusWidth = (view.cmdWidth*2)-2
+
   proc renderView(view: var View) =
+    view.computeCmdWidths(parent.box.w)
+    
     frame "view":
       box 0, 0, parent.box.w, parent.box.h
 
@@ -82,22 +98,29 @@ when isMainModule:
         stroke "#000000"
 
         text "command":
-          box 2, 2, parent.box.w-2, 19
+          box 2, 2, view.cmdWidth, 19
           fill "#000000"
           font "IBM Plex Sans", 14.0, 400.0, 15, hLeft, vTop
           highlightColor "#888ACA"
           multiline false
           binding view.commandValue
-          onRightClick:
-            view.cmdRightClickHandler()
+          onInput:
+            for buttonIdx in 0..<buttonDown.len:
+              let button = Button(buttonIdx)
+              if buttonDown[button]:
+                case button
+                  of Button.ENTER:
+                    view.cmdHandler()
+                  else:
+                    discard
 
         text "status":
-          box parent.box.w / 2, 2, (parent.box.w / 2)-2, 19
+          box view.statusXPos, 2, view.statusWidth, 19
           fill "#000000"
           font "IBM Plex Sans", 14.0, 400.0, 15, hLeft, vTop
           multiline false
           characters view.computeStatusLine()
-          textAutoResize tsWidthAndHeight
+          textAutoResize tsHeight
           layoutAlign laStretch
 
       frame "workarea":
@@ -117,7 +140,15 @@ when isMainModule:
             binding view.editorText
             onInput:
               inc view.dirty
-        
+              for buttonIdx in 0..<buttonDown.len:
+                let button = Button(buttonIdx)
+                if buttonDown[button]:
+                  case button
+                    of Button.TAB:
+                      textBox.typeCharacters("  ")
+                    else:
+                      discard
+                
   var mainView = View(commandValue: "", editorText: "")
 
   proc drawMain() =
