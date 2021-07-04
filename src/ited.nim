@@ -4,9 +4,14 @@ import osproc
 import fidget
 import typography/textboxes
 from strutils import strip, splitWhitespace, startsWith, countLines, intToStr
+from os import expandTilde
+
+proc loadFont(name: string, pathOrUrl: string) =
+  echo pathOrUrl
+  loadFontAbsolute(name, pathOrUrl)
 
 when isMainModule:
-  loadFont("IBM Plex Sans", "IBMPlexSans-Regular.ttf")
+  loadFont("IBM Plex Sans", expandTilde("~/.local/bin/data/IBMPlexSans-Regular.ttf"))
   setTitle("It Ed. Hello.")
 
   type
