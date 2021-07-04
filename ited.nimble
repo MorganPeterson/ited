@@ -1,7 +1,7 @@
 # Package
 
 version       = "0.1.0"
-author        = "MorganPeterson"
+author        = "Morgan Peterson"
 description   = "It Ed. Hello."
 license       = "ISC"
 srcDir        = "src"

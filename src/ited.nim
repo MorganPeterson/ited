@@ -1,10 +1,9 @@
 ## It Ed Hello Ed It Or
 
 import osproc
-import strutils
-import sequtils
 import fidget
 import typography/textboxes
+from strutils import strip, splitWhitespace, startsWith, countLines, intToStr
 
 when isMainModule:
   loadFont("IBM Plex Sans", "IBMPlexSans-Regular.ttf")
@@ -22,70 +21,57 @@ when isMainModule:
       editorText: string
       statusValue: string
 
-  const AvailableCommands: array[3, string] = ["o", "w", "c"]
-
   proc cmdHandler(view: var View) =
-    var cmd: string
-    var arg: string
+    ## try to execute as os program
+    let cmd = view.commandValue.strip()
 
-    let command = view.commandValue
-    
-    if command.len > 0:
-      for word in split(command):
-        if AvailableCommands.anyIt(it == word):
-          cmd = word.strip()
+    # get out of here empty commands
+    if cmd.len < 1:
+      view.msg = "empty command"
+      return
+
+    try:
+      let checkCmd = cmd.splitWhitespace(1)
+      # if we are writing out to a file
+      if checkCmd[0] == "w":
+        if checkCmd.len > 1:
+          var fn: string
+          for c in 1..(checkCmd.len-1):
+            fn = fn & checkCmd[c]
+            writefile(fn, view.editorText)
         else:
-          arg = word.strip()
-      view.msg = ""
-      case cmd
-        of AvailableCommands[0]:
-          # open - read file
-          try:
-            view.editorText = readFile(arg)
-            view.fileName = arg
-            view.dirty = 0
-          except:
-            view.msg = getCurrentExceptionMsg()
-            discard
-        of AvailableCommands[1]:
-          # write - write to file
-          try:
-            if arg.len == 0:
-              writeFile(view.fileName, view.editorText)
-            else:
-              writeFile(arg, view.editorText)
-            view.dirty = 0
-            view.msg = "Written"
-          except IOError:
-            view.msg = getCurrentExceptionMsg()
-            discard
-        of AvailableCommands[2]:
-          # close - remove text from buffer
-          view.editorText = ""
-          view.dirty = 0
-          view.fileName = ""
-        else:
-          # try to execute as os program
-          try:
-            view.editorText = execProcess(command)
-          except:
-            view.msg = getCurrentExceptionMsg()
-            discard
+          writefile(view.fileName, view.editorText)
+        view.dirty = 0
+        view.msg = "written"
+      else:
+        # if not writing then go to command line
+        view.editorText = execProcess(cmd)
+    except:
+      view.msg = getCurrentExceptionMsg()
+      discard
+    finally:
+      # meow! meow! King Friday! Save my file name.
+      if cmd.startsWith("cat"):
+        view.fileName = cmd[3..^1].strip(leading=true)
+        view.msg = ""
 
   proc computeStatusLine(view: var View): string =
+    ## create our string from the status
     let lines = view.editorText.countLines().intToStr() & "L | "
-    let words = view.editorText.count(' ').intToStr() & "W | "
+    let words = view.editorText.splitWhitespace().len.intToStr() & "W | "
     let chars = view.editorText.len.intToStr() & "C "
     let fn = "[ " & view.fileName & " ] "
     let dy = "[ " & view.dirty.intToStr() & " ] "
     result = dy & fn & lines & words & chars & " " & view.msg
 
   proc computeCmdWidths(view: var View, pWidth: float32) =
-    view.cmdWidth = pWidth / 3
+    ## compute our status line dimensions
+    view.cmdWidth = pWidth / 2
     view.statusXPos = view.cmdWidth
-    view.statusWidth = (view.cmdWidth*2)-2
+    view.statusWidth = (view.cmdWidth)-2
 
   proc renderView(view: var View) =
+    ## render our editor view
     view.computeCmdWidths(parent.box.w)
     
     frame "view":
@@ -149,10 +135,16 @@ when isMainModule:
                     else:
                       discard
                 
-  var mainView = View(commandValue: "", editorText: "")
+  var mainView = View(
+    dirty: 0,
+    msg: "",
+    fileName: "",
+    commandValue: "",
+    editorText: "",
+    statusValue: "")
 
   proc drawMain() =
-    group "editor":
+    group "ited":
       box 0, 0, parent.box.w, parent.box.h
       fill "#FFFFFF"
 
