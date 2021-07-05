@@ -2,7 +2,7 @@
 
 import parsecfg
 import fidget
-from strutils import strip, splitWhitespace, startsWith, countLines, intToStr, parseFloat
+from strutils import strip, splitWhitespace, startsWith, countLines, intToStr, parseFloat, split
 from os import expandTilde, fileExists
 from osproc import execProcess
 from typography/textboxes import typeCharacters
@@ -24,8 +24,9 @@ const DefaultConfigDirHome = expandTilde("~/.config/ited/ited.cfg")
 when isMainModule:
   type
     View = ref object of RootObj
-      dirty: int32
+      dirty: bool
       msg: string
+      cursorPos: int
       fileName: string
       commandValue: string
       editorText: string
@@ -55,7 +56,8 @@ when isMainModule:
       colors: Colors
 
   var mainView = View(
-    dirty: 0,
+    dirty: false,
+    cursorPos: 0,
     msg: "",
     fileName: "",
     commandValue: "",
@@ -126,8 +128,17 @@ when isMainModule:
             writefile(fn, view.editorText)
         else:
           writefile(view.fileName, view.editorText)
-        view.dirty = 0
+        view.dirty = false
         view.msg = "written"
+      elif checkCmd[0] == "o":
+        if checkCmd.len > 1:
+          var fn: string
+          for c in 1..(checkCmd.len-1):
+            fn = fn & checkCmd[c]
+            view.editorText = readfile(fn)
+            view.fileName = fn
+        view.dirty = false
+        view.msg = ""
       else:
         # if not writing then go to command line
         view.editorText = execProcess(cmd)
@@ -139,15 +150,22 @@ when isMainModule:
       if cmd.startsWith("cat"):
         view.fileName = cmd[3..^1].strip(leading=true)
         view.msg = ""
+      view.dirty = false
 
   proc computeStatusLine(view: var View): string =
     ## create our string from the status
-    let lines = view.editorText.countLines().intToStr() & "L | "
-    let words = view.editorText.splitWhitespace().len.intToStr() & "W | "
-    let chars = view.editorText.len.intToStr() & "C "
-    let fn = "[ " & view.fileName & " ] "
-    let dy = "[ " & view.dirty.intToStr() & " ] "
-    result = dy & fn & lines & words & chars & " " & view.msg
+    var currentLine: string = "1"
+    var currentChar: string = "1"
+    var isDirty = ""
+
+    if view.editorText.len > 0:
+      let lines = view.editorText[0..(view.cursorPos-1)].split("\n")
+      currentLine = lines.len.intToStr()
+      currentChar = lines[^1].len.intToStr()
+    if view.dirty:
+      isDirty = "[+]"
+    let fn = " " & view.fileName & " "
+    result = isDirty & fn & currentLine & ":" & currentChar & " " & view.msg
 
   proc renderCmd(view: var View) =
     frame "command":
@@ -203,15 +221,23 @@ when isMainModule:
         multiline true
         binding view.editorText
         onInput:
-          inc view.dirty
           for buttonIdx in 0..<buttonDown.len:
             let button = Button(buttonIdx)
             if buttonDown[button]:
+              view.cursorPos = textBox.cursor
               case button
                 of Button.TAB:
                   textBox.typeCharacters(ItEdCfg.tab)
                 else:
                   discard
+              if button >= Button.SPACE and button <= Button.GRAVE_ACCENT:
+                view.dirty = true
+              elif button >= Button.ENTER and button <= Button.BACKSPACE:
+                view.dirty = true
+              elif button == Button.DELETE:
+                view.dirty = true
+              elif button >= Button.KP_0 and button < Button.KP_EQUAL:
+                view.dirty = true
 
   proc renderView(view: var View) =
     ## render our editor view
