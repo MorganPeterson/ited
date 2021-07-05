@@ -1,14 +1,27 @@
 ## It Ed Hello Ed It Or
 
+import parsecfg
 import fidget
-from strutils import strip, splitWhitespace, startsWith, countLines, intToStr
+from strutils import strip, splitWhitespace, startsWith, countLines, intToStr, parseFloat
+from os import expandTilde, fileExists
 from osproc import execProcess
 from typography/textboxes import typeCharacters
 
-when isMainModule:
-  loadFontAbsolute("IBM Plex Sans", "/usr/share/fonts/TTF/IBMPlexSans-Regular.ttf")
-  setTitle("It Ed. Hello.")
+const DefaultTitle = "It Ed. Hello."
+const DefaultTab = "    "
+const DefaultRegularFont = "/usr/share/fonts/TTF/DejaVuSans.ttf"
+const DefaultItalicFont = "/usr/share/fonts/TTF/DejaVuSans-Oblique.ttf"
+const DefaultBoldFont = "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"
+const DefaultSizeFont = "14.0"
+const DefaultColorPrimary = "#FFFFEA"
+const DefaultColorSecondary = "#AEEEEE"
+const DefaultColorHighlight = "#888ACA"
+const DefaultColorText = "#000000"
+const DefaultColorBorder = "#000000"
+const DefaultConfigDirEtc = "/usr/local/etc/ited/ited.cfg"
+const DefaultConfigDirHome = expandTilde("~/.config/ited/ited.cfg")
 
+when isMainModule:
   type
     View = ref object of RootObj
       dirty: int32
@@ -17,7 +30,30 @@ when isMainModule:
       commandValue: string
       editorText: string
       statusValue: string
-  
+
+    Colors = ref object of RootObj
+      primary: string
+      secondary: string
+      highlight: string
+      text: string
+      border: string
+
+    Font = ref object of RootObj
+      name: string
+      url: string
+
+    Fonts = ref object of RootObj
+      regular: Font
+      italic: Font
+      bold: Font
+      size: float32
+
+    Config = ref object of RootObj
+      title: string
+      tab: string
+      fonts: Fonts
+      colors: Colors
+
   var mainView = View(
     dirty: 0,
     msg: "",
@@ -25,6 +61,50 @@ when isMainModule:
     commandValue: "",
     editorText: "",
     statusValue: "")
+
+  proc loadCfg(): Config =
+    var cfg: parsecfg.Config
+
+    if fileExists(DefaultConfigDirHome):
+      cfg = loadConfig(DefaultConfigDirHome)
+    elif fileExists(DefaultConfigDirEtc):
+      cfg = loadConfig(DefaultConfigDirEtc)
+    else:
+      cfg = newConfig()
+
+    result = Config(
+      title: getSectionValue(cfg, "Common", "Title", DefaultTitle),
+      tab: getSectionValue(cfg, "Common", "Tab", DefaultTab),
+      fonts: Fonts(
+        regular: Font(
+          name: "Regular",
+          url: getSectionValue(cfg, "Font", "Regular", DefaultRegularFont)
+        ),
+        italic: Font(
+          name: "Italic",
+          url: getSectionValue(cfg, "Font", "Italic", DefaultItalicFont)
+        ),
+        bold: Font(
+          name: "Bold",
+          url: getSectionValue(cfg, "Font", "Bold", DefaultBoldFont)
+        ),
+        size: parseFloat(getSectionValue(cfg, "Font", "Size", DefaultSizeFont))
+      ),
+      colors: Colors(
+        primary: getSectionValue(cfg, "Colors", "Primary", DefaultColorPrimary),
+        secondary: getSectionValue(cfg, "Colors", "Secondary", DefaultColorSecondary),
+        highlight: getSectionValue(cfg, "Colors", "Highlight", DefaultColorHighlight),
+        text: getSectionValue(cfg, "Colors", "Text", DefaultColorText),
+        border: getSectionValue(cfg, "Colors", "Border", DefaultColorBorder)
+      )
+    )
+
+  let ItEdCfg = loadCfg()
+
+  loadFontAbsolute(ItEdCfg.fonts.regular.name, ItEdCfg.fonts.regular.url)
+  loadFontAbsolute(ItEdCfg.fonts.italic.name, ItEdCfg.fonts.italic.url)
+  loadFontAbsolute(ItEdCfg.fonts.bold.name, ItEdCfg.fonts.bold.url)
+  setTitle(ItEdCfg.title)
 
   proc cmdHandler(view: var View) =
     ## try to execute as os program
@@ -72,15 +152,15 @@ when isMainModule:
   proc renderCmd(view: var View) =
     frame "command":
       box 0, 0, parent.box.w, 19
-      fill "#AEEEEE"
+      fill ItEdCfg.colors.secondary
       strokeWeight 1
-      stroke "#000000"
+      stroke ItEdCfg.colors.border
 
       text "command":
         box 2, 2, parent.box.w, 19
-        fill "#000000"
-        font "IBM Plex Sans", 14.0, 400.0, 15, hLeft, vTop
-        highlightColor "#888ACA"
+        fill ItEdCfg.colors.text
+        font ItEdCfg.fonts.regular.name, ItEdCfg.fonts.size, 400.0, 15, hLeft, vTop
+        highlightColor ItEdCfg.colors.highlight
         multiline false
         binding view.commandValue
         onInput:
@@ -96,14 +176,14 @@ when isMainModule:
   proc renderStatus(view: var View) =
     frame "status":
       box 0, parent.box.h-19, parent.box.w, 19
-      fill "#AEEEEE"
+      fill ItEdCfg.colors.secondary
       strokeWeight 1
-      stroke "#000000"
+      stroke ItEdCfg.colors.border
 
       text "status":
         box 2, 2, parent.box.w, 19
-        fill "#000000"
-        font "IBM Plex Sans", 14.0, 400.0, 15, hLeft, vTop
+        fill ItEdCfg.colors.text
+        font ItEdCfg.fonts.regular.name, ItEdCfg.fonts.size, 400.0, 15, hLeft, vTop
         multiline false
         characters view.computeStatusLine()
         textAutoResize tsHeight
@@ -112,14 +192,14 @@ when isMainModule:
   proc renderEditor(view: var View) =
     frame "editor":
       box 1, 18, parent.box.w-2, parent.box.h-38
-      fill "#FFFFEA"
+      fill ItEdCfg.colors.primary
       clipContent true
 
       text "editorText":
         box 2, 2, parent.box.w-4, parent.box.h-2
-        fill "#000000"
-        font "IBM Plex Sans", 14.0, 400.0, 15, hLeft, vTop
-        highlightColor "#888ACA"
+        fill ItEdCfg.colors.text
+        font ItEdCfg.fonts.regular.name, ItEdCfg.fonts.size, 400.0, 15, hLeft, vTop
+        highlightColor ItEdCfg.colors.highlight
         multiline true
         binding view.editorText
         onInput:
@@ -129,7 +209,7 @@ when isMainModule:
             if buttonDown[button]:
               case button
                 of Button.TAB:
-                  textBox.typeCharacters("  ")
+                  textBox.typeCharacters(ItEdCfg.tab)
                 else:
                   discard
 
