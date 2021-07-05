@@ -1,17 +1,12 @@
 ## It Ed Hello Ed It Or
 
-import osproc
 import fidget
-import typography/textboxes
 from strutils import strip, splitWhitespace, startsWith, countLines, intToStr
-from os import expandTilde
-
-proc loadFont(name: string, pathOrUrl: string) =
-  echo pathOrUrl
-  loadFontAbsolute(name, pathOrUrl)
+from osproc import execProcess
+from typography/textboxes import typeCharacters
 
 when isMainModule:
-  loadFont("IBM Plex Sans", expandTilde("~/.local/bin/data/IBMPlexSans-Regular.ttf"))
+  loadFontAbsolute("IBM Plex Sans", "/usr/share/fonts/TTF/IBMPlexSans-Regular.ttf")
   setTitle("It Ed. Hello.")
 
   type
@@ -20,11 +15,16 @@ when isMainModule:
       msg: string
       fileName: string
       commandValue: string
-      cmdWidth: float32
-      statusWidth: float32
-      statusXPos: float32
       editorText: string
       statusValue: string
+  
+  var mainView = View(
+    dirty: 0,
+    msg: "",
+    fileName: "",
+    commandValue: "",
+    editorText: "",
+    statusValue: "")
 
   proc cmdHandler(view: var View) =
     ## try to execute as os program
@@ -69,91 +69,82 @@ when isMainModule:
     let dy = "[ " & view.dirty.intToStr() & " ] "
     result = dy & fn & lines & words & chars & " " & view.msg
 
-  proc computeCmdWidths(view: var View, pWidth: float32) =
-    ## compute our status line dimensions
-    view.cmdWidth = pWidth / 2
-    view.statusXPos = view.cmdWidth
-    view.statusWidth = (view.cmdWidth)-2
+  proc renderCmd(view: var View) =
+    frame "command":
+      box 0, 0, parent.box.w, 19
+      fill "#AEEEEE"
+      strokeWeight 1
+      stroke "#000000"
+
+      text "command":
+        box 2, 2, parent.box.w, 19
+        fill "#000000"
+        font "IBM Plex Sans", 14.0, 400.0, 15, hLeft, vTop
+        highlightColor "#888ACA"
+        multiline false
+        binding view.commandValue
+        onInput:
+          for buttonIdx in 0..<buttonDown.len:
+            let button = Button(buttonIdx)
+            if buttonDown[button]:
+              case button
+                of Button.ENTER:
+                  view.cmdHandler()
+                else:
+                  discard
+  
+  proc renderStatus(view: var View) =
+    frame "status":
+      box 0, parent.box.h-19, parent.box.w, 19
+      fill "#AEEEEE"
+      strokeWeight 1
+      stroke "#000000"
+
+      text "status":
+        box 2, 2, parent.box.w, 19
+        fill "#000000"
+        font "IBM Plex Sans", 14.0, 400.0, 15, hLeft, vTop
+        multiline false
+        characters view.computeStatusLine()
+        textAutoResize tsHeight
+        layoutAlign laStretch
+
+  proc renderEditor(view: var View) =
+    frame "editor":
+      box 1, 18, parent.box.w-2, parent.box.h-38
+      fill "#FFFFEA"
+      clipContent true
+
+      text "editorText":
+        box 2, 2, parent.box.w-4, parent.box.h-2
+        fill "#000000"
+        font "IBM Plex Sans", 14.0, 400.0, 15, hLeft, vTop
+        highlightColor "#888ACA"
+        multiline true
+        binding view.editorText
+        onInput:
+          inc view.dirty
+          for buttonIdx in 0..<buttonDown.len:
+            let button = Button(buttonIdx)
+            if buttonDown[button]:
+              case button
+                of Button.TAB:
+                  textBox.typeCharacters("  ")
+                else:
+                  discard
 
   proc renderView(view: var View) =
     ## render our editor view
-    view.computeCmdWidths(parent.box.w)
-    
-    frame "view":
-      box 0, 0, parent.box.w, parent.box.h
-
-      rectangle "commandContainer":
-        box 0, 0, parent.box.w, 19
-        fill "#AEEEEE"
-        strokeWeight 1
-        stroke "#000000"
-
-        text "command":
-          box 2, 2, view.cmdWidth, 19
-          fill "#000000"
-          font "IBM Plex Sans", 14.0, 400.0, 15, hLeft, vTop
-          highlightColor "#888ACA"
-          multiline false
-          binding view.commandValue
-          onInput:
-            for buttonIdx in 0..<buttonDown.len:
-              let button = Button(buttonIdx)
-              if buttonDown[button]:
-                case button
-                  of Button.ENTER:
-                    view.cmdHandler()
-                  else:
-                    discard
-
-        text "status":
-          box view.statusXPos, 2, view.statusWidth, 19
-          fill "#000000"
-          font "IBM Plex Sans", 14.0, 400.0, 15, hLeft, vTop
-          multiline false
-          characters view.computeStatusLine()
-          textAutoResize tsHeight
-          layoutAlign laStretch
-
-      frame "workarea":
-        box 1, 18, parent.box.w-2, parent.box.h-19
-
-        rectangle "editorContainer":
-          box 0, 0, parent.box.w, parent.box.h
-          fill "#FFFFEA"
-          scrollBars true
-          
-          text "editor":
-            box 2, 2, parent.box.w-2, parent.box.h-2
-            fill "#000000"
-            font "IBM Plex Sans", 14.0, 400.0, 15, hLeft, vTop
-            highlightColor "#888ACA"
-            multiline true
-            binding view.editorText
-            onInput:
-              inc view.dirty
-              for buttonIdx in 0..<buttonDown.len:
-                let button = Button(buttonIdx)
-                if buttonDown[button]:
-                  case button
-                    of Button.TAB:
-                      textBox.typeCharacters("  ")
-                    else:
-                      discard
-                
-  var mainView = View(
-    dirty: 0,
-    msg: "",
-    fileName: "",
-    commandValue: "",
-    editorText: "",
-    statusValue: "")
-
-  proc drawMain() =
-    group "ited":
-      box 0, 0, parent.box.w, parent.box.h
+    component "ited":
+      box root.box
       fill "#FFFFFF"
 
-      renderView(mainView)
+      view.renderCmd()
+      view.renderEditor()
+      view.renderStatus()
+                
+  proc drawMain() =
+    renderView(mainView)
 
   proc main() =
     startFidget(drawMain)
