@@ -141,6 +141,7 @@ when isMainModule:
             fn = fn & checkCmd[c]
           view.editorText = readfile(fn)
           view.fileName = fn
+          view.cursorPos = 1
         view.dirty = false
         view.msg = ""
       elif checkCmd[0] == "/":
@@ -172,6 +173,7 @@ when isMainModule:
       if cmd.startsWith("cat"):
         view.fileName = cmd[3..^1].strip(leading=true)
         view.msg = ""
+        view.cursorPos = 1
       view.dirty = false
 
   proc computeStatusLine(view: var View): string =
