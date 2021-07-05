@@ -2,7 +2,7 @@
 
 import parsecfg
 import fidget
-from strutils import strip, splitWhitespace, startsWith, countLines, intToStr, parseFloat, split
+from strutils import strip, splitWhitespace, startsWith, countLines, intToStr, parseFloat, split, find, rfind
 from os import expandTilde, fileExists
 from osproc import execProcess
 from typography/textboxes import typeCharacters, setCursor, adjustScroll
@@ -33,6 +33,8 @@ when isMainModule:
       commandValue: string
       editorText: string
       statusValue: string
+      editorNode: Node
+      commandNode: Node
 
     Colors = ref object of RootObj
       primary: string
@@ -127,7 +129,7 @@ when isMainModule:
           var fn: string
           for c in 1..(checkCmd.len-1):
             fn = fn & checkCmd[c]
-            writefile(fn, view.editorText)
+          writefile(fn, view.editorText)
         else:
           writefile(view.fileName, view.editorText)
         view.dirty = false
@@ -137,10 +139,28 @@ when isMainModule:
           var fn: string
           for c in 1..(checkCmd.len-1):
             fn = fn & checkCmd[c]
-            view.editorText = readfile(fn)
-            view.fileName = fn
+          view.editorText = readfile(fn)
+          view.fileName = fn
         view.dirty = false
         view.msg = ""
+      elif checkCmd[0] == "/":
+        var searchString: string
+        for c in 1..(checkCmd.len-1):
+          searchString = searchString & checkCmd[c]
+        view.cursorPos = view.editorText.find(searchString, start=Natural(view.cursorPos))
+        keyboard.focus(view.editorNode)
+        textBox.setCursor(view.cursorPos)
+        textBox.selector = view.cursorPos + searchString.len
+        textBox.adjustScroll()
+      elif checkCmd[0] == "?":
+        var searchString: string
+        for c in 1..(checkCmd.len-1):
+          searchString = searchString & checkCmd[c]
+        view.cursorPos = view.editorText.rfind(searchString, last=Natural(view.cursorPos))
+        keyboard.focus(view.editorNode)
+        textBox.setCursor(view.cursorPos)
+        textBox.selector = view.cursorPos + searchString.len
+        textBox.adjustScroll()
       else:
         # if not writing then go to command line
         view.editorText = execProcess(cmd)
@@ -192,7 +212,7 @@ when isMainModule:
                   view.cmdHandler()
                 of Button.F1:
                   # change focus to editorText
-                  keyboard.focus(root.nodes[0].nodes[1].nodes[0])
+                  keyboard.focus(view.editorNode)
                   textBox.setCursor(view.cursorPos)
                   textBox.adjustScroll()
                 else:
@@ -237,7 +257,7 @@ when isMainModule:
                   textBox.typeCharacters(ItEdCfg.tab)
                 of Button.F2:
                   # change focus to commandText
-                  keyboard.focus(root.nodes[0].nodes[0].nodes[0])
+                  keyboard.focus(view.commandNode)
                 else:
                   discard
 
@@ -259,6 +279,8 @@ when isMainModule:
       view.renderCmd()
       view.renderEditor()
       view.renderStatus()
+      view.commandNode = root.nodes[0].nodes[0].nodes[0]
+      view.editorNode = root.nodes[0].nodes[1].nodes[0]
                 
   proc drawMain() =
     renderView(mainView)
