@@ -5,7 +5,7 @@ import fidget
 from strutils import strip, splitWhitespace, startsWith, countLines, intToStr, parseFloat, split
 from os import expandTilde, fileExists
 from osproc import execProcess
-from typography/textboxes import typeCharacters
+from typography/textboxes import typeCharacters, setCursor, adjustScroll
 
 const DefaultTitle = "It Ed. Hello."
 const DefaultTab = "    "
@@ -13,6 +13,8 @@ const DefaultRegularFont = "/usr/share/fonts/TTF/DejaVuSans.ttf"
 const DefaultItalicFont = "/usr/share/fonts/TTF/DejaVuSans-Oblique.ttf"
 const DefaultBoldFont = "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"
 const DefaultSizeFont = "14.0"
+const DefaultWeightFont = 400
+const DefaultHeightFont = 16
 const DefaultColorPrimary = "#FFFFEA"
 const DefaultColorSecondary = "#AEEEEE"
 const DefaultColorHighlight = "#888ACA"
@@ -174,10 +176,10 @@ when isMainModule:
       strokeWeight 1
       stroke ItEdCfg.colors.border
 
-      text "command":
+      text "commandText":
         box 2, 2, parent.box.w, 19
         fill ItEdCfg.colors.text
-        font ItEdCfg.fonts.regular.name, ItEdCfg.fonts.size, 400.0, 15, hLeft, vTop
+        font ItEdCfg.fonts.regular.name, ItEdCfg.fonts.size, DefaultWeightFont, DefaultHeightFont, hLeft, vTop
         highlightColor ItEdCfg.colors.highlight
         multiline false
         binding view.commandValue
@@ -188,6 +190,11 @@ when isMainModule:
               case button
                 of Button.ENTER:
                   view.cmdHandler()
+                of Button.F1:
+                  # change focus to editorText
+                  keyboard.focus(root.nodes[0].nodes[1].nodes[0])
+                  textBox.setCursor(view.cursorPos)
+                  textBox.adjustScroll()
                 else:
                   discard
   
@@ -198,10 +205,10 @@ when isMainModule:
       strokeWeight 1
       stroke ItEdCfg.colors.border
 
-      text "status":
+      text "statusText":
         box 2, 2, parent.box.w, 19
         fill ItEdCfg.colors.text
-        font ItEdCfg.fonts.regular.name, ItEdCfg.fonts.size, 400.0, 15, hLeft, vTop
+        font ItEdCfg.fonts.regular.name, ItEdCfg.fonts.size, DefaultWeightFont, DefaultHeightFont, hLeft, vTop
         multiline false
         characters view.computeStatusLine()
         textAutoResize tsHeight
@@ -216,7 +223,7 @@ when isMainModule:
       text "editorText":
         box 2, 2, parent.box.w-4, parent.box.h-2
         fill ItEdCfg.colors.text
-        font ItEdCfg.fonts.regular.name, ItEdCfg.fonts.size, 400.0, 15, hLeft, vTop
+        font ItEdCfg.fonts.regular.name, ItEdCfg.fonts.size, DefaultWeightFont, DefaultHeightFont, hLeft, vTop
         highlightColor ItEdCfg.colors.highlight
         multiline true
         binding view.editorText
@@ -228,8 +235,12 @@ when isMainModule:
               case button
                 of Button.TAB:
                   textBox.typeCharacters(ItEdCfg.tab)
+                of Button.F2:
+                  # change focus to commandText
+                  keyboard.focus(root.nodes[0].nodes[0].nodes[0])
                 else:
                   discard
+
               if button >= Button.SPACE and button <= Button.GRAVE_ACCENT:
                 view.dirty = true
               elif button >= Button.ENTER and button <= Button.BACKSPACE:
