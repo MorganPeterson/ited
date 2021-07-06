@@ -170,6 +170,7 @@ when isMainModule:
       else:
         # if not writing then go to command line
         view.editorText = execProcess(cmd)
+        view.cursorPos = 1
     except:
       view.msg = getCurrentExceptionMsg()
       discard
