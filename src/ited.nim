@@ -5,7 +5,7 @@ import fidget
 from strutils import strip, splitWhitespace, startsWith, countLines, intToStr, parseFloat, split, find, rfind
 from os import expandTilde, fileExists
 from osproc import execProcess
-from typography/textboxes import typeCharacters, setCursor, adjustScroll
+from typography/textboxes import typeCharacters, setCursor, adjustScroll, copy
 
 const DefaultTitle = "It Ed. Hello."
 const DefaultTab = "    "
@@ -112,9 +112,14 @@ when isMainModule:
   loadFontAbsolute(ItEdCfg.fonts.bold.name, ItEdCfg.fonts.bold.url)
   setTitle(ItEdCfg.title)
 
-  proc cmdHandler(view: var View) =
+  proc cmdHandler(view: var View, cmdType: string) =
     ## try to execute as os program
-    let cmd = view.commandValue.strip()
+    var cmd: string
+
+    if cmdType == "Enter":
+      cmd = view.commandValue.strip()
+    elif cmdType == "RightClick":
+      cmd = textBox.copy()
 
     # get out of here empty commands
     if cmd.len < 1:
@@ -205,13 +210,15 @@ when isMainModule:
         highlightColor ItEdCfg.colors.highlight
         multiline false
         binding view.commandValue
+        onRightClick:
+          view.cmdHandler("RightClick")
         onInput:
           for buttonIdx in 0..<buttonDown.len:
             let button = Button(buttonIdx)
             if buttonDown[button]:
               case button
                 of Button.ENTER:
-                  view.cmdHandler()
+                  view.cmdHandler("Enter")
                 of Button.F1:
                   # change focus to editorText
                   keyboard.focus(view.editorNode)
