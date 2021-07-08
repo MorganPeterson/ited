@@ -3,6 +3,7 @@
 ##
 
 import parsecfg
+import docopt
 import fidget
 from strutils import strip, splitWhitespace, startsWith, countLines, intToStr, parseFloat, split, find, rfind
 from os import expandTilde, fileExists
@@ -308,6 +309,29 @@ when isMainModule:
     renderView(mainView)
 
   proc main() =
+    let doc = """
+It Ed.
+
+Usage:
+  ited <file>
+
+Options:
+  -h --help   Show this screen.
+  --version   Show version.
+"""
+    let args = docopt(doc, version="ited 0.2.1")
+
+    if args["<file>"]:
+      try:
+        mainView.editorText = readfile($args["<file>"])
+        mainView.fileName = $args["<file>"]
+        mainView.cursorPos = 1
+      except:
+        let e = getCurrentException()
+        let msg = getCurrentExceptionMsg()
+        echo repr(e) & ": " & msg
+        return
+
     startFidget(drawMain)
 
 main()
