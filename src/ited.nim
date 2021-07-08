@@ -322,10 +322,16 @@ Options:
     let args = docopt(doc, version="ited 0.2.1")
 
     if args["<file>"]:
+      let f = $args["<file>"]
       try:
-        mainView.editorText = readfile($args["<file>"])
-        mainView.fileName = $args["<file>"]
-        mainView.cursorPos = 1
+        if os.fileExists(f):
+          mainView.editorText = readfile(f)
+          mainView.fileName = f
+          mainView.cursorPos = 1
+        elif os.dirExists(f):
+          mainView.editorText = execProcess("ls " & f)
+        else:
+          return 
       except:
         let e = getCurrentException()
         let msg = getCurrentExceptionMsg()
