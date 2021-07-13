@@ -8,7 +8,8 @@ import fidget
 from strutils import strip, splitWhitespace, startsWith, countLines, intToStr, parseFloat, split, find, rfind
 from os import expandTilde, fileExists
 from osproc import execProcess
-from typography/textboxes import typeCharacters, setCursor, adjustScroll, cut 
+from typography/textboxes import typeCharacters, setCursor, adjustScroll, cut, text
+from fidget/opengl/base import exit
 
 ## default values to keep you safe
 const DefaultTitle = "It Ed. Hello."
@@ -39,7 +40,7 @@ when isMainModule:
       editorText: string
       statusValue: string
       editorNode: Node
-      commandNode: Node
+      statusNode: Node
 
     Colors = ref object of RootObj
       ## configurable colors for the app
@@ -130,6 +131,7 @@ when isMainModule:
   proc cmdHandler(view: var View) =
     ## handles all the commands sent from the user in the command line
     let cmd = textBox.cut()
+    view.editorText = textBox.text()
 
     # get out of here empty commands
     if cmd.len < 1:
@@ -150,7 +152,6 @@ when isMainModule:
             writefile(view.fileName, view.editorText)
           view.dirty = false
           view.msg = "written"
-          keyboard.focus(view.editorNode)
         of "o":
           # open a file for reading
           if checkCmd.len > 1:
@@ -162,7 +163,7 @@ when isMainModule:
             view.cursorPos = 1
           view.dirty = false
           view.msg = ""
-          keyboard.focus(view.editorNode)
+          keyboard.focus(view.statusNode)
         of "/", "?":
           # search one way or the other but never both
           var searchString: string
@@ -177,11 +178,14 @@ when isMainModule:
           textBox.setCursor(view.cursorPos)
           textBox.selector = view.cursorPos + searchString.len
           textBox.adjustScroll()
+        of "q":
+          exit()
+          quit()
         else:
           # if not writing then go to command line
           view.editorText = execProcess(cmd)
           view.cursorPos = 1
-          keyboard.focus(view.editorNode)
+          keyboard.focus(view.statusNode)
     except:
       view.msg = getCurrentExceptionMsg()
       discard
@@ -191,7 +195,6 @@ when isMainModule:
         view.fileName = cmd[3..^1].strip(leading=true)
         view.msg = ""
         view.cursorPos = 1
-        keyboard.focus(view.editorNode)
       view.dirty = false
 
   proc computeStatusLine(view: var View): string =
@@ -247,15 +250,6 @@ when isMainModule:
             let button = Button(buttonIdx)
             if buttonDown[button]:
               view.cursorPos = textBox.cursor
-              case button
-                of Button.TAB:
-                  textBox.typeCharacters(ItEdCfg.tab)
-                of Button.F2:
-                  # change focus to commandText
-                  keyboard.focus(view.commandNode)
-                else:
-                  discard
-
               # check if the user dirtied the text
               case button
                 of Button.SPACE..Button.GRAVE_ACCENT, Button.ENTER..Button.BACKSPACE, Button.DELETE, Button.KP_0..Button.KP_EQUAL:
@@ -271,8 +265,8 @@ when isMainModule:
 
       view.renderEditor()
       view.renderStatus()
-      view.commandNode = root.nodes[0].nodes[0].nodes[0]
-      view.editorNode = root.nodes[0].nodes[1].nodes[0]
+      view.editorNode = root.nodes[0].nodes[0].nodes[0]
+      view.statusNode = root.nodes[0].nodes[1].nodes[0]
                 
   proc drawMain() =
     renderView(mainView)
