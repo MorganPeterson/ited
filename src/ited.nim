@@ -8,7 +8,7 @@ import fidget
 from strutils import strip, splitWhitespace, startsWith, countLines, intToStr, parseFloat, split, find, rfind
 from os import expandTilde, fileExists
 from osproc import execProcess
-from typography/textboxes import typeCharacters, setCursor, adjustScroll, copy
+from typography/textboxes import typeCharacters, setCursor, adjustScroll, cut 
 
 ## default values to keep you safe
 const DefaultTitle = "It Ed. Hello."
@@ -127,14 +127,9 @@ when isMainModule:
   loadFontAbsolute(ItEdCfg.fonts.bold.name, ItEdCfg.fonts.bold.url)
   setTitle(ItEdCfg.title)
 
-  proc cmdHandler(view: var View, cmdType: string) =
+  proc cmdHandler(view: var View) =
     ## handles all the commands sent from the user in the command line
-    var cmd: string
-
-    if cmdType == "Enter":
-      cmd = view.commandValue.strip()
-    elif cmdType == "RightClick":
-      cmd = textBox.copy()
+    let cmd = textBox.cut()
 
     # get out of here empty commands
     if cmd.len < 1:
@@ -155,6 +150,7 @@ when isMainModule:
             writefile(view.fileName, view.editorText)
           view.dirty = false
           view.msg = "written"
+          keyboard.focus(view.editorNode)
         of "o":
           # open a file for reading
           if checkCmd.len > 1:
@@ -166,6 +162,7 @@ when isMainModule:
             view.cursorPos = 1
           view.dirty = false
           view.msg = ""
+          keyboard.focus(view.editorNode)
         of "/", "?":
           # search one way or the other but never both
           var searchString: string
@@ -173,9 +170,10 @@ when isMainModule:
             searchString = searchString & checkCmd[c]
           if checkCmd[0] == "/":
             view.cursorPos = view.editorText.find(searchString, start=Natural(view.cursorPos))
+            view.cursorPos = view.cursorPos - cmd.len
           elif checkCmd[0] == "?":
+            view.cursorPos = view.cursorPos - cmd.len
             view.cursorPos = view.editorText.rfind(searchString, last=Natural(view.cursorPos))
-          keyboard.focus(view.editorNode)
           textBox.setCursor(view.cursorPos)
           textBox.selector = view.cursorPos + searchString.len
           textBox.adjustScroll()
@@ -183,6 +181,7 @@ when isMainModule:
           # if not writing then go to command line
           view.editorText = execProcess(cmd)
           view.cursorPos = 1
+          keyboard.focus(view.editorNode)
     except:
       view.msg = getCurrentExceptionMsg()
       discard
@@ -192,6 +191,7 @@ when isMainModule:
         view.fileName = cmd[3..^1].strip(leading=true)
         view.msg = ""
         view.cursorPos = 1
+        keyboard.focus(view.editorNode)
       view.dirty = false
 
   proc computeStatusLine(view: var View): string =
@@ -209,39 +209,6 @@ when isMainModule:
     let fn = " " & view.fileName & " "
     result = isDirty & fn & currentLine & ":" & currentChar & " " & view.msg
 
-  proc renderCmd(view: var View) =
-    frame "command":
-      box 0, 0, parent.box.w, 19
-      fill ItEdCfg.colors.secondary
-      strokeWeight 1
-      stroke ItEdCfg.colors.border
-
-      text "commandText":
-        box 2, 2, parent.box.w, 19
-        fill ItEdCfg.colors.text
-        font ItEdCfg.fonts.regular.name, ItEdCfg.fonts.size, DefaultWeightFont, DefaultHeightFont, hLeft, vTop
-        highlightColor ItEdCfg.colors.highlight
-        multiline false
-        binding view.commandValue
-        onRightClick:
-          # click the command, padre!
-          view.cmdHandler("RightClick")
-        onInput:
-          # who is handling who?
-          for buttonIdx in 0..<buttonDown.len:
-            let button = Button(buttonIdx)
-            if buttonDown[button]:
-              case button
-                of Button.ENTER:
-                  view.cmdHandler("Enter")
-                of Button.F1:
-                  # change focus to editorText
-                  keyboard.focus(view.editorNode)
-                  textBox.setCursor(view.cursorPos)
-                  textBox.adjustScroll()
-                else:
-                  discard
-  
   proc renderStatus(view: var View) =
     frame "status":
       box 0, parent.box.h-19, parent.box.w, 19
@@ -260,7 +227,7 @@ when isMainModule:
 
   proc renderEditor(view: var View) =
     frame "editor":
-      box 1, 18, parent.box.w-2, parent.box.h-38
+      box 1, 1, parent.box.w-2, parent.box.h-20
       fill ItEdCfg.colors.primary
       clipContent true # get our scolling in order
 
@@ -271,6 +238,9 @@ when isMainModule:
         highlightColor ItEdCfg.colors.highlight
         multiline true
         binding view.editorText
+        onRightClick:
+          # click the command, padre!
+          view.cmdHandler()
         onInput:
           # looking for them custom buttons
           for buttonIdx in 0..<buttonDown.len:
@@ -299,7 +269,6 @@ when isMainModule:
       box root.box
       fill "#FFFFFF"
 
-      view.renderCmd()
       view.renderEditor()
       view.renderStatus()
       view.commandNode = root.nodes[0].nodes[0].nodes[0]
